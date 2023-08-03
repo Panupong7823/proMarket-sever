@@ -1,7 +1,9 @@
 CREATE TABLE User_type (
-    Utype_id char(5),
-    Utype_name varchar(50),
-    PRIMARY KEY (Utype_id)
+    u_id varchar(10),
+    u_name varchar(30),
+    u_pasword varchar(30),
+    u_type char(1),
+    PRIMARY KEY (u_id)
 );
 
 CREATE TABLE Users (

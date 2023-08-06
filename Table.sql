@@ -1,82 +1,75 @@
-CREATE TABLE User_type (
-    u_id varchar(10),
+CREATE TABLE user (
+    u_id int(100),
     u_name varchar(30),
-    u_pasword varchar(30),
-    u_type char(1),
+    u_password varchar(30),
+    u_role varchar(30),
     PRIMARY KEY (u_id)
 );
 
-CREATE TABLE Users (
-    
-    User_id int(5) ,
-    Utype_id char(5),
-    User_fname varchar(50),
-    User_lname varchar(50),
-    User_tel varchar(50),
-    User_add varchar(100),
-    User_email varchar(50),
-    User_user varchar(50),
-    User_pass varchar(200),
-    PRIMARY KEY (User_id), 
-    FOREIGN KEY (Utype_id) REFERENCES User_type(Utype_id) ON UPDATE CASCADE ON DELETE CASCADE
+CREATE TABLE owner ( 
+    ow_id varchar(10),
+    ow_fname varchar(50),
+    ow_lname varchar(50),
+    ow_uname varchar(30),
+    ow_pasword varchar(30),
+    u_id int(10),
+    PRIMARY KEY (ow_id), 
+    FOREIGN KEY (u_id) REFERENCES user(u_id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE TABLE Table_status (    
-    Status_id int(5),
-    Status_name varchar(20),
-    PRIMARY KEY (Status_id)
+CREATE TABLE admin ( 
+    ad_id varchar(10),
+    ad_fname varchar(50),
+    ad_lname varchar(50),
+    ad_uname varchar(30),
+    ad_pasword varchar(30),
+    u_id int(10),
+    PRIMARY KEY (ad_id), 
+    FOREIGN KEY (u_id) REFERENCES user(u_id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE TABLE Tables (
-    Status_id int(5),    
-    t_id int(5),
-    t_seat int(10),
-    PRIMARY KEY (t_id), 
-    FOREIGN KEY (Status_id) REFERENCES Table_status(Status_id) ON UPDATE CASCADE ON DELETE CASCADE
+CREATE TABLE customer ( 
+    cs_id varchar(10),
+    cs_fname varchar(50),
+    cs_lname varchar(50),
+    cs_nname varchar(10),
+    cs_uname varchar(30),
+    cs_pasword varchar(30),
+    cs_career varchar(50),
+    cs_tel varchar(50),
+    cs_saraly int(10),
+    u_id int(10),
+    PRIMARY KEY (cs_id), 
+    FOREIGN KEY (u_id) REFERENCES user(u_id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE TABLE Orders (
-    t_id int(5),
-    o_id int(10),
-    o_date date,
-    tatal_price float(50),
-    o_plate float(50),
-    PRIMARY KEY (o_id),
-    FOREIGN KEY (t_id) REFERENCES Tables(t_id) ON UPDATE CASCADE ON DELETE CASCADE
-
+CREATE TABLE balance ( 
+    ba_id varchar(10),
+    stale int(10),
+    date_time DATETIME,
+    cs_id varchar(10),
+    PRIMARY KEY (ba_id), 
+    FOREIGN KEY (cs_id) REFERENCES customer(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE TABLE Menu(
-    m_id int(10),
-    m_name varchar(50),
-    m_details varchar(50),
-    m_price int(50),
-    m_img varchar(50),
-    PRIMARY KEY (m_id)
+CREATE TABLE revenue ( 
+    re_id varchar(10),
+    payout int(10),
+    date_time DATETIME,
+    cs_id varchar(10),
+    PRIMARY KEY (re_id), 
+    FOREIGN KEY (cs_id) REFERENCES customer(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-CREATE TABLE Bill(
-    b_id int(10),
-    o_id int(10),
-    User_id int(5),
-    total_price int(10),
-   
-    
-    PRIMARY KEY (b_id),
-    FOREIGN KEY(o_id) REFERENCES Orders(o_id) ON UPDATE CASCADE ON DELETE CASCADE,
-    FOREIGN KEY(User_id) REFERENCES Users(User_id) ON UPDATE CASCADE ON DELETE CASCADE
+CREATE TABLE aggregate ( 
+    re_id varchar(10),
+    ba_id varchar(10),
+    total int(10),
+    cs_id varchar(10),
+    PRIMARY KEY (re_id), 
+    FOREIGN KEY (cs_id) REFERENCES customer(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 
-
-CREATE TABLE Detail_order(
-    d_id int(10),
-    m_id int(10),
-    o_id int(10),
-    d_plates varchar(50),
-    Price float(50),
-    d_status varchar(50),
-    PRIMARY KEY (d_id),
-    FOREIGN KEY (m_id) REFERENCES Menu(m_id)  ON UPDATE CASCADE ON DELETE CASCADE
-
-);
-
+SELECT balance.ba_id, balance.cs_id, balance.stale - COALESCE(revenue.payout, 0) AS total
+FROM balance
+LEFT JOIN revenue ON balance.cs_id = revenue.cs_id

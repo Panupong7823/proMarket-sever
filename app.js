@@ -198,6 +198,24 @@ WHERE r.cs_id = ?;
   });
 });
 
+app.get('/datauser/:userId', (req, res) => {
+  const { userId } = req.params;
+
+  const sql = `
+    SELECT * FROM users WHERE cs_id = ?;
+  `;
+
+  connection.query(sql, [userId], (err, result) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      return res.status(500).json({ message: 'Error fetching user data' });
+    }
+
+    res.json(result);
+  });
+});
+
+
 
 
 app.delete('/delete', (req, res) => {

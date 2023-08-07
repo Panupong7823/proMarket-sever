@@ -1,75 +1,76 @@
-CREATE TABLE user (
-    u_id int(100),
-    u_name varchar(30),
-    u_password varchar(30),
-    u_role varchar(30),
-    PRIMARY KEY (u_id)
-);
-
-CREATE TABLE owner ( 
-    ow_id varchar(10),
-    ow_fname varchar(50),
-    ow_lname varchar(50),
-    ow_uname varchar(30),
-    ow_pasword varchar(30),
-    u_id int(10),
-    PRIMARY KEY (ow_id), 
-    FOREIGN KEY (u_id) REFERENCES user(u_id) ON UPDATE CASCADE ON DELETE CASCADE
-);
-
-CREATE TABLE admin ( 
-    ad_id varchar(10),
-    ad_fname varchar(50),
-    ad_lname varchar(50),
-    ad_uname varchar(30),
-    ad_pasword varchar(30),
-    u_id int(10),
-    PRIMARY KEY (ad_id), 
-    FOREIGN KEY (u_id) REFERENCES user(u_id) ON UPDATE CASCADE ON DELETE CASCADE
-);
-
-CREATE TABLE customer ( 
-    cs_id varchar(10),
-    cs_fname varchar(50),
-    cs_lname varchar(50),
-    cs_nname varchar(10),
-    cs_uname varchar(30),
-    cs_pasword varchar(30),
-    cs_career varchar(50),
-    cs_tel varchar(50),
-    cs_saraly int(10),
-    u_id int(10),
-    PRIMARY KEY (cs_id), 
-    FOREIGN KEY (u_id) REFERENCES user(u_id) ON UPDATE CASCADE ON DELETE CASCADE
-);
-
-CREATE TABLE balance ( 
-    ba_id varchar(10),
-    stale int(10),
-    date_time DATETIME,
-    cs_id varchar(10),
-    PRIMARY KEY (ba_id), 
-    FOREIGN KEY (cs_id) REFERENCES customer(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
-);
-
-CREATE TABLE revenue ( 
-    re_id varchar(10),
-    payout int(10),
-    date_time DATETIME,
-    cs_id varchar(10),
-    PRIMARY KEY (re_id), 
-    FOREIGN KEY (cs_id) REFERENCES customer(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
-);
-
-CREATE TABLE aggregate ( 
-    re_id varchar(10),
-    ba_id varchar(10),
-    total int(10),
-    cs_id varchar(10),
-    PRIMARY KEY (re_id), 
-    FOREIGN KEY (cs_id) REFERENCES customer(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
-);
-
 SELECT balance.ba_id, balance.cs_id, balance.stale - COALESCE(revenue.payout, 0) AS total
 FROM balance
 LEFT JOIN revenue ON balance.cs_id = revenue.cs_id
+
+
+
+SELECT balance.cs_id, balance.date_time, revenue.date_time, balance.stale,revenue.payout,aggregate.total
+FROM balance
+INNER JOIN revenue ON balance.cs_id = revenue.cs_id
+INNER JOIN aggregate ON balance.cs_id = aggregate.cs_id;
+
+
+
+SELECT 
+    COALESCE(balance.cs_id, revenue.cs_id, aggregate.cs_id) AS cs_id,
+    COALESCE(balance.date_time, revenue.date_time) AS date_time,
+    COALESCE(balance.stale, 0) AS stale,
+    COALESCE(revenue.payout, 0) AS payout,
+    COALESCE(aggregate.total, 0) AS total
+FROM balance
+LEFT JOIN revenue ON balance.cs_id = revenue.cs_id
+LEFT JOIN aggregate ON balance.cs_id = aggregate.cs_id
+
+UNION
+
+SELECT 
+    COALESCE(balance.cs_id, revenue.cs_id, aggregate.cs_id) AS cs_id,
+    COALESCE(balance.date_time, revenue.date_time) AS date_time,
+    COALESCE(balance.stale, 0) AS stale,
+    COALESCE(revenue.payout, 0) AS payout,
+    COALESCE(aggregate.total, 0) AS total
+FROM revenue
+LEFT JOIN balance ON balance.cs_id = revenue.cs_id
+LEFT JOIN aggregate ON revenue.cs_id = aggregate.cs_id
+
+UNION
+
+SELECT 
+    COALESCE(balance.cs_id, revenue.cs_id, aggregate.cs_id) AS cs_id,
+    COALESCE(balance.date_time, revenue.date_time) AS date_time,
+    COALESCE(balance.stale, 0) AS stale,
+    COALESCE(revenue.payout, 0) AS payout,
+    COALESCE(aggregate.total, 0) AS total
+FROM aggregate
+LEFT JOIN balance ON balance.cs_id = aggregate.cs_id
+LEFT JOIN revenue ON aggregate.cs_id = revenue.cs_id;
+
+-- แยกแถวจากตาราง balance
+SELECT cs_id, date_time,stale, 0 AS payout, 0 AS total
+FROM balance
+
+UNION ALL
+
+-- แยกแถวจากตาราง revenue
+SELECT cs_id , date_time, 0 AS stale, payout, 0 AS total
+FROM revenue
+
+UNION ALL
+
+-- แยกแถวจากตาราง aggregate
+SELECT  a.cs_id, b.date_time, 0 AS stale, 0 AS payout, total
+FROM aggregate a
+JOIN balance b ON a.cs_id = b.cs_id;
+
+
+-- ใช้กับ databalance
+SELECT cs_id, date_time,stale, 0 AS payout, 0 AS total
+FROM balance
+
+UNION ALL
+SELECT r.cs_id, r.date_time, 0 AS stale, r.payout, a.total
+FROM revenue r
+JOIN (
+    SELECT cs_id, total
+    FROM aggregate
+) a ON r.cs_id = a.cs_id;

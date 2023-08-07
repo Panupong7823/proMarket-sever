@@ -6,7 +6,7 @@ CREATE TABLE users (
     password varchar(30),
     career varchar(50),
     tel varchar(50),
-    row int(10),
+    role int(10),
     PRIMARY KEY (cs_id)
 );
 

@@ -23,7 +23,23 @@ const connection = mysql.createConnection({
 app.post('/regis', jsonParser, function (req, res, next) {
   bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
     connection.query(
-      'INSERT INTO users(cs_id,username,password,firstname,lastname,career,tel,role) VALUES (?,?,?,?,?,?,?,3)',
+      'INSERT INTO users(cs_id,username,password,firstname,lastname,career,tel,salary,role) VALUES (?,?,?,?,?,?,?,?,3)',
+      [req.body.cs_id, req.body.username, hash, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary, req.body.role],
+      function (err, results, fields) {
+        if (err) {
+          res.status(500).json({ status: 'error', message: err });
+          return
+        }
+        res.json({ status: 'ok' })
+      }
+    );
+  });
+})
+
+app.post('/regisAd', jsonParser, function (req, res, next) {
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    connection.query(
+      'INSERT INTO users(cs_id,username,password,firstname,lastname,career,tel,role) VALUES (?,?,?,?,?,?,?,2)',
       [req.body.cs_id, req.body.username, hash, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.role],
       function (err, results, fields) {
         if (err) {
@@ -93,7 +109,7 @@ app.post('/auth', jsonParser, function (req, res, next) {
 
 //ใช้ดึงข้อมูลส่วนตัวทั้งหมด
 app.get('/data', (req, res) => {
-  const query = 'SELECT * FROM users';
+  const query = 'SELECT * FROM users WHERE role = 3';
 
   connection.query(query, (err, result) => {
     if (err) {
@@ -105,30 +121,98 @@ app.get('/data', (req, res) => {
     res.json(result);
   });
 });
-//ใช้ดึงข้อมูลยอดค้างทั้งหมด
-app.get('/databalance', (req, res) => {
-  const query = `
-  SELECT cs_id, date_time,stale, 0 AS payout, 0 AS total
-  FROM balance
+//ใช้ดึงข้อมูลส่วนตัวของadmin
+app.get('/dataAd', (req, res) => {
+  const query = 'SELECT * FROM users WHERE role = 2';
+
+  connection.query(query, (err, result) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      res.status(500).json({ error: 'Failed to fetch data from database' });
+      return;
+    }
+
+    res.json(result);
+  });
+});
+//ใช้ดึงข้อมูลยอดค้างทั้งหมด(เก่า)
+// app.get('/databalance', (req, res) => {
+//   const query = `
+//   SELECT cs_id, date_time,stale, 0 AS payout, 0 AS total
+//   FROM balance
   
-  UNION ALL
-  SELECT r.cs_id, r.date_time, 0 AS stale, r.payout, a.total
-  FROM revenue r
-  JOIN (
-      SELECT cs_id, total
-      FROM aggregate
-  ) a ON r.cs_id = a.cs_id;`;
+//   UNION ALL
+//   SELECT r.cs_id, r.date_time, 0 AS stale, r.payout, a.total
+//   FROM revenue r
+//   JOIN (
+//       SELECT cs_id, total
+//       FROM aggregate
+//   ) a ON r.cs_id = a.cs_id;`;
 
-  connection.query(query, (err, result) => {
+//   connection.query(query, (err, result) => {
+//     if (err) {
+//       console.error('Error executing query:', err);
+//       res.status(500).json({ error: 'Failed to fetch data from database' });
+//       return;
+//     }
+
+//     res.json(result);
+//   });
+// });
+
+//ใช้ดึงข้อมูลยอดค้างทั้งหมด
+app.get('/databalances', (req, res) => {
+  const databl = `
+    SELECT
+    id,
+    cs_id,
+    date_time,
+    amount,
+    status,
+    CASE
+      WHEN status = 1 THEN 'stale'
+      WHEN status = 2 THEN 'pay'
+    END AS status_description
+    FROM balancess;
+  `;
+
+  const datatl = `
+    SELECT
+    b.cs_id,
+      SUM(CASE WHEN b.status = 1 THEN b.amount ELSE 0 END) AS stale_total,
+      SUM(CASE WHEN b.status = 2 THEN b.amount ELSE 0 END) AS pay_total,
+      SUM(CASE WHEN b.status = 1 THEN b.amount ELSE 0 END) - SUM(CASE WHEN b.status = 2 THEN b.amount ELSE 0 END) AS total
+    FROM
+      balancess b
+    GROUP BY
+      b.cs_id;
+
+  `;
+
+  connection.query(databl, (err, resultbl) => {
     if (err) {
-      console.error('Error executing query:', err);
+      console.error('Error executing query 1:', err);
       res.status(500).json({ error: 'Failed to fetch data from database' });
       return;
     }
 
-    res.json(result);
+    connection.query(datatl, (err, resultl) => {
+      if (err) {
+        console.error('Error executing datatotal:', err);
+        res.status(500).json({ error: 'Failed to fetch data from database' });
+        return;
+      }
+
+      const responseData = {
+        databalanceResult:resultbl,
+        datatotalResult:resultl
+      };
+
+      res.json(responseData);
+    });
   });
 });
+
 
 // Middleware สำหรับตรวจสอบ Token และเอาข้อมูลผู้ใช้งาน
 function verifyToken(req, res, next) {
@@ -170,33 +254,52 @@ function getUserDetail(req, res, next) {
 app.get('/datatotalt/:userId', (req, res) => {
   const { userId } = req.params;
 
-  const sql = `
-  SELECT cs_id, date_time, stale, 0 AS payout, 0 AS total
-FROM balance 
-WHERE cs_id = ?
+  // SQL for INSERT INTO aggregate
+  const insertSql = `
+    INSERT INTO aggregate (ba_id, re_id, cs_id, total)
+    SELECT balance.ba_id, revenue.re_id, balance.cs_id, balance.stale - COALESCE(revenue.payout, 0) AS total
+    FROM balance
+    LEFT JOIN revenue ON balance.ba_id = revenue.re_id
+    WHERE balance.cs_id = ?;
+  `;
 
-UNION ALL
-
-SELECT r.cs_id, r.date_time, 0 AS stale, r.payout, a.total
-FROM revenue r
-JOIN (
-    SELECT cs_id, total
-    FROM aggregate
-) a ON r.cs_id = a.cs_id
-WHERE r.cs_id = ?;
-
-`;
-
-
-  connection.query(sql, [userId,userId], (err, result) => {
-    if (err) {
-      console.error('Error executing query:', err);
-      return res.status(500).json({ message: 'Error fetching amount data' });
+  // Execute INSERT query first
+  connection.query(insertSql, [userId], (insertErr, insertResult) => {
+    if (insertErr) {
+      console.error('Error executing insert query:', insertErr);
+      return res.status(500).json({ message: 'Error inserting data into aggregate table' });
     }
 
-    res.json(result);
+    // SQL for SELECT data
+    const selectSql = `
+      SELECT cs_id, date_time, stale, 0 AS payout, 0 AS total
+      FROM balance 
+      WHERE cs_id = ?
+
+      UNION ALL
+
+      SELECT r.cs_id, r.date_time, 0 AS stale, r.payout, a.total
+      FROM revenue r
+      JOIN (
+          SELECT cs_id, total
+          FROM aggregate
+      ) a ON r.cs_id = a.cs_id
+      WHERE r.cs_id = ?;
+    `;
+
+    // Execute SELECT query after INSERT
+    connection.query(selectSql, [userId, userId], (selectErr, selectResult) => {
+      if (selectErr) {
+        console.error('Error executing select query:', selectErr);
+        return res.status(500).json({ message: 'Error fetching amount data' });
+      }
+
+      res.json(selectResult);
+    });
   });
 });
+
+
 
 app.get('/datauser/:userId', (req, res) => {
   const { userId } = req.params;
@@ -259,9 +362,10 @@ app.get('/data/:id', (req, res) => {
   });
 });
 
+//หน้าแก้ไขผู้ใช้
 app.put('/update/:id', (req, res) => {
   const id = req.params.id;
-  const { firstname, lastname, username, password, career, tel, cs_id } = req.body;
+  const { firstname, lastname, username, password, career, tel, cs_id, salary } = req.body;
 
   // แฮชรหัสผ่านก่อนบันทึกลงในฐานข้อมูล
   bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
@@ -272,8 +376,8 @@ app.put('/update/:id', (req, res) => {
     }
 
     // เมื่อแฮชรหัสผ่านสำเร็จ คุณสามารถอัปเดตข้อมูลในฐานข้อมูลได้
-    const query = 'UPDATE users SET firstname = ?, lastname = ?, username = ?, password = ?, career = ?, tel = ?, cs_id = ? WHERE id = ?';
-    connection.query(query, [firstname, lastname, username, hashedPassword, career, tel, cs_id, id], (err, result) => {
+    const query = 'UPDATE users SET firstname = ?, lastname = ?, username = ?, password = ?, career = ?, tel = ?, cs_id = ?, salary = ? WHERE id = ?';
+    connection.query(query, [firstname, lastname, username, hashedPassword, career, tel, cs_id,salary, id], (err, result) => {
       // ข้อผิดพลาดในการคิวรีฐานข้อมูล
       if (err) {
         console.error('Error executing query:', err);
@@ -301,6 +405,84 @@ app.put('/update/:id', (req, res) => {
     });
   });
 });
+
+//หน้าแก้ไขยอด
+app.put('/updatestale/:id', (req, res) => {
+  const id = req.params.id;
+  const { amount } = req.body;
+
+  const query = 'UPDATE balancess SET amount = ? WHERE id = ?';
+    connection.query(query, [amount, id], (err, result) => {
+      // ข้อผิดพลาดในการคิวรีฐานข้อมูล
+      if (err) {
+        console.error('Error executing query:', err);
+        res.status(500).json({ error: 'Failed to update data in database' });
+        return;
+      }
+
+      // ไม่พบข้อมูลที่ต้องการอัปเดต
+      if (result.affectedRows === 0) {
+        res.status(404).json({ error: 'Data with the specified ID not found' });
+      } else {
+        // อัปเดตสำเร็จ
+        const selectQuery = 'SELECT * FROM balancess WHERE id = ?';
+        connection.query(selectQuery, [id], (err, role) => {
+          if (err) {
+            console.error('Error executing query:', err);
+            res.status(500).json({ error: 'Failed to fetch updated data from database' });
+            return;
+          }
+
+          // ส่งข้อมูลที่อัปเดตสำเร็จกลับไป
+          res.json({ status: 'ok', message: 'Data updated successfully', data: role });
+        });
+      }
+    });
+  });
+
+
+app.get('/datastale/:id', (req, res) => {
+  const id = req.params.id;
+  const query = 'SELECT * FROM balancess WHERE id = ?';
+  connection.query(query, [id], (err, result) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      res.status(500).json({ error: 'Failed to fetch data from database' });
+      return;
+    }
+
+    if (result.length === 0) {
+      res.status(404).json({ error: 'Data with the specified ID not found' });
+    } else {
+      res.json(result[0]);
+    }
+  });
+});
+
+app.delete('/deletebl', (req, res) => {
+  const id = req.body.id;
+
+  if (!id) {
+    res.status(400).json({ error: 'ID is required in the request body' });
+    return;
+  }
+
+  const query = 'DELETE FROM balancess WHERE id = ?'; 
+  connection.query(query, [id], (err, result) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      res.status(500).json({ error: 'Failed to delete data from database' });
+      return;
+    }
+
+    if (result.affectedRows === 0) { // แก้ไขจาก affectedRoles เป็น affectedRows
+      res.status(404).json({ error: 'Data with the specified ID not found' });
+    } else {
+      res.json({ message: 'Data deleted successfully' });
+    }
+  });
+});
+
 
 
 

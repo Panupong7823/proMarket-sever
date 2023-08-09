@@ -6,6 +6,7 @@ CREATE TABLE users (
     password varchar(30),
     career varchar(50),
     tel varchar(50),
+    salary int(10),
     role int(10),
     PRIMARY KEY (cs_id)
 );
@@ -43,3 +44,21 @@ INSERT INTO aggregate (ba_id, re_id, cs_id, total)
 SELECT balance.ba_id, revenue.re_id, balance.cs_id, balance.stale - COALESCE(revenue.payout, 0) AS total
 FROM balance
 LEFT JOIN revenue ON balance.ba_id = revenue.re_id;
+
+CREATE TABLE balances (
+    cs_id varchar(10),
+    date_time DATETIME,
+    amount int(10),
+    status varchar(10),
+    PRIMARY KEY (cs_id, date_time), 
+    FOREIGN KEY (cs_id) REFERENCES users(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE balances (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    cs_id varchar(10),
+    date_time DATETIME,
+    amount int(10),
+    status varchar(10),
+    FOREIGN KEY (cs_id) REFERENCES users(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
+);

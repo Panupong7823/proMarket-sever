@@ -19,12 +19,44 @@ const connection = mysql.createConnection({
 });
 
 
-
+//ใส่ข้อมูลส่วนตัวลูกค้า
 app.post('/regis', jsonParser, function (req, res, next) {
   bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
     connection.query(
       'INSERT INTO users(cs_id,username,password,firstname,lastname,career,tel,salary,role) VALUES (?,?,?,?,?,?,?,?,3)',
-      [req.body.cs_id, req.body.username, hash, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary, req.body.role],
+      [req.body.cs_id, req.body.username, hash, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
+      function (err, results, fields) {
+        if (err) {
+          res.status(500).json({ status: 'error', message: err });
+          return
+        }
+        res.json({ status: 'ok' })
+      }
+    );
+  });
+})
+//ใส่ข้อมูลส่วนตัวadmin
+app.post('/regisAd', jsonParser, function (req, res, next) {
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    connection.query(
+      'INSERT INTO users(cs_id,username,password,firstname,lastname,career,tel,role) VALUES (?,?,?,?,?,?,?,2)',
+      [req.body.cs_id, req.body.username, hash, req.body.firstname, req.body.lastname, req.body.career, req.body.tel],
+      function (err, results, fields) {
+        if (err) {
+          res.status(500).json({ status: 'error', message: err });
+          return
+        }
+        res.json({ status: 'ok' })
+      }
+    );
+  });
+})
+//ใส่ข้อมูลส่วนตัว owner
+app.post('/regisOw', jsonParser, function (req, res, next) {
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    connection.query(
+      'INSERT INTO users(cs_id,username,password,firstname,lastname,career,tel,role) VALUES (?,?,?,?,?,?,?,1)',
+      [req.body.cs_id, req.body.username, hash, req.body.firstname, req.body.lastname, req.body.career, req.body.tel],
       function (err, results, fields) {
         if (err) {
           res.status(500).json({ status: 'error', message: err });
@@ -36,11 +68,12 @@ app.post('/regis', jsonParser, function (req, res, next) {
   });
 })
 
-app.post('/regisAd', jsonParser, function (req, res, next) {
-  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+
+app.post('/regisBl', jsonParser, function (req, res, next) {
+
     connection.query(
-      'INSERT INTO users(cs_id,username,password,firstname,lastname,career,tel,role) VALUES (?,?,?,?,?,?,?,2)',
-      [req.body.cs_id, req.body.username, hash, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.role],
+      'INSERT INTO balancess (cs_id,date_time,status,amount) VALUES (?,NOW(),?,?)',
+      [req.body.cs_id, req.body.status, req.body.amount],
       function (err, results, fields) {
         if (err) {
           res.status(500).json({ status: 'error', message: err });
@@ -50,7 +83,7 @@ app.post('/regisAd', jsonParser, function (req, res, next) {
       }
     );
   });
-})
+
 
 app.post('/login', jsonParser, function (req, res, next) {
   connection.query(
@@ -131,10 +164,25 @@ app.get('/dataAd', (req, res) => {
       res.status(500).json({ error: 'Failed to fetch data from database' });
       return;
     }
-
     res.json(result);
   });
 });
+//ใช้ดึงข้อมูลส่วนตัวของowner
+app.get('/dataOw', (req, res) => {
+  const query = 'SELECT * FROM users WHERE role = 1';
+
+  connection.query(query, (err, result) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      res.status(500).json({ error: 'Failed to fetch data from database' });
+      return;
+    }
+    
+    res.json(result);
+  });
+});
+
+
 //ใช้ดึงข้อมูลยอดค้างทั้งหมด(เก่า)
 // app.get('/databalance', (req, res) => {
 //   const query = `
@@ -362,7 +410,7 @@ app.get('/data/:id', (req, res) => {
   });
 });
 
-//หน้าแก้ไขผู้ใช้
+//หน้าแก้ไขผู้ใช้ (แก้ไขรหัสลูกค้าไม่ได้)
 app.put('/update/:id', (req, res) => {
   const id = req.params.id;
   const { firstname, lastname, username, password, career, tel, cs_id, salary } = req.body;

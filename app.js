@@ -234,7 +234,6 @@ app.get('/databalances', (req, res) => {
       balancess b
     GROUP BY
       b.cs_id;
-
   `;
 
   connection.query(databl, (err, resultbl) => {
@@ -302,50 +301,63 @@ function getUserDetail(req, res, next) {
 app.get('/datatotalt/:userId', (req, res) => {
   const { userId } = req.params;
 
-  // SQL for INSERT INTO aggregate
-  const insertSql = `
-    INSERT INTO aggregate (ba_id, re_id, cs_id, total)
-    SELECT balance.ba_id, revenue.re_id, balance.cs_id, balance.stale - COALESCE(revenue.payout, 0) AS total
-    FROM balance
-    LEFT JOIN revenue ON balance.ba_id = revenue.re_id
-    WHERE balance.cs_id = ?;
+  const databl = `
+    SELECT
+      id,
+      cs_id,
+      date_time,
+      amount,
+      status,
+      CASE
+        WHEN status = 1 THEN 'stale'
+        WHEN status = 2 THEN 'pay'
+      END AS status_description
+    FROM balancess
+    WHERE cs_id = ?;
   `;
 
-  // Execute INSERT query first
-  connection.query(insertSql, [userId], (insertErr, insertResult) => {
-    if (insertErr) {
-      console.error('Error executing insert query:', insertErr);
-      return res.status(500).json({ message: 'Error inserting data into aggregate table' });
+  connection.query(databl, [userId], (datablErr, datablResult) => {
+    if (datablErr) {
+      console.error('Error executing databl query:', datablErr);
+      return res.status(500).json({ message: 'Error fetching data from balancess' });
     }
-
-    // SQL for SELECT data
-    const selectSql = `
-      SELECT cs_id, date_time, stale, 0 AS payout, 0 AS total
-      FROM balance 
-      WHERE cs_id = ?
-
-      UNION ALL
-
-      SELECT r.cs_id, r.date_time, 0 AS stale, r.payout, a.total
-      FROM revenue r
-      JOIN (
-          SELECT cs_id, total
-          FROM aggregate
-      ) a ON r.cs_id = a.cs_id
-      WHERE r.cs_id = ?;
-    `;
-
-    // Execute SELECT query after INSERT
-    connection.query(selectSql, [userId, userId], (selectErr, selectResult) => {
-      if (selectErr) {
-        console.error('Error executing select query:', selectErr);
-        return res.status(500).json({ message: 'Error fetching amount data' });
-      }
-
-      res.json(selectResult);
+      res.json({
+        databl: datablResult,
+      });
     });
   });
-});
+
+//ใช้ในการดึงข้อมูลตารางยอดรวม
+app.get('/datatotaltl/:userId', (req, res) => {
+  const { userId } = req.params;
+
+ 
+  const datatl = `
+    SELECT
+      b.cs_id,
+      SUM(CASE WHEN b.status = 1 THEN b.amount ELSE 0 END) AS stale_total,
+      SUM(CASE WHEN b.status = 2 THEN b.amount ELSE 0 END) AS pay_total,
+      SUM(CASE WHEN b.status = 1 THEN b.amount ELSE 0 END) - SUM(CASE WHEN b.status = 2 THEN b.amount ELSE 0 END) AS total
+    FROM
+      balancess b
+    WHERE
+      b.cs_id = ?
+    GROUP BY
+      b.cs_id;
+  `;
+
+    connection.query(datatl, [userId], (datatlErr, datatlResult) => {
+      if (datatlErr) {
+        console.error('Error executing datatl query:', datatlErr);
+        return res.status(500).json({ message: 'Error fetching data from aggregate' });
+      }
+
+      res.json({
+        datatl: datatlResult
+      });
+    });
+  });
+
 
 
 

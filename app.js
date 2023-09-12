@@ -15,7 +15,8 @@ const mysql = require('mysql2');
 const connection = mysql.createConnection({
   host: 'localhost',
   user: 'root',
-  database: 'subsomboon'
+  password: '1234',
+  database: 'testproject'
 });
 
 
@@ -23,18 +24,58 @@ const connection = mysql.createConnection({
 app.post('/regis', jsonParser, function (req, res, next) {
   bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
     connection.query(
-      'INSERT INTO users(cs_id,username,password,firstname,lastname,career,tel,salary,role) VALUES (?,?,?,?,?,?,?,?,3)',
-      [req.body.cs_id, req.body.username, hash, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
+      'INSERT INTO users(username, password, role) VALUES (?,?,?)',
+      [req.body.username, hash, req.body.role],
       function (err, results, fields) {
         if (err) {
           res.status(500).json({ status: 'error', message: err });
-          return
+          return;
         }
-        res.json({ status: 'ok' })
+        const user_id = results.insertId; 
+        
+        if (req.body.role === '1') {
+          connection.query(
+            'INSERT INTO customer(user_id, em_id, firstname, lastname, career, tel, salary) VALUES (?,?,?,?,?,?,?)',
+            [user_id, req.body.em_id, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
+            function (err, results, fields) {
+              if (err) {
+                res.status(500).json({ status: 'error', message: err });
+                return;
+              }
+              res.json({ status: 'ok' });
+            }
+          );
+        } else if (req.body.role === '2') {
+          connection.query(
+            'INSERT INTO admin(user_id, firstName, lastName) VALUES (?,?,?)',
+            [user_id, req.body.firstname, req.body.lastname],
+            function (err, results, fields) {
+              if (err) {
+                res.status(500).json({ status: 'error', message: err });
+                return;
+              }
+              res.json({ status: 'ok' });
+            }
+          );
+        } else if (req.body.role === '3') {
+          connection.query(
+            'INSERT INTO owner(user_id, firstName, lastName) VALUES (?,?,?)',
+            [user_id, req.body.firstname, req.body.lastname],
+            function (err, results, fields) {
+              if (err) {
+                res.status(500).json({ status: 'error', message: err });
+                return;
+              }
+              res.json({ status: 'ok' });
+            }
+          );
+        }else {
+          res.status(500).json({ status: 'error', message: 'Invalid role' });
+        }
       }
     );
   });
-})
+});
 //ใส่ข้อมูลส่วนตัวadmin
 app.post('/regisAd', jsonParser, function (req, res, next) {
   bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
@@ -68,7 +109,7 @@ app.post('/regisOw', jsonParser, function (req, res, next) {
   });
 })
 
-
+//ใส่ข้อมูลบัญชี
 app.post('/regisBl', jsonParser, function (req, res, next) {
 
     connection.query(
@@ -118,7 +159,6 @@ app.post('/login', jsonParser, function (req, res, next) {
             secret,
             { expiresIn: '1h' }
           );
-          // ตรงนี้ส่งค่า role ของผู้ใช้ไปด้วย
           res.json({ status: 'ok', message: 'login success', token, user: users[0].role });
         } else {
           res.json({ status: 'error', message: 'login failed' });
@@ -259,8 +299,6 @@ app.get('/databalances', (req, res) => {
     });
   });
 });
-
-
 // Middleware สำหรับตรวจสอบ Token และเอาข้อมูลผู้ใช้งาน
 function verifyToken(req, res, next) {
   const token = req.headers['authorization'];
@@ -278,7 +316,6 @@ function verifyToken(req, res, next) {
     next();
   });
 }
-
 // Middleware สำหรับดึงข้อมูลผู้ใช้งานจากฐานข้อมูล
 function getUserDetail(req, res, next) {
   const sql = 'SELECT * FROM users WHERE username = ?';
@@ -296,7 +333,6 @@ function getUserDetail(req, res, next) {
     next();
   });
 }
-
 //ใช้ในการดึงข้อมูลตารางยอดรวม
 app.get('/datatotalt/:userId', (req, res) => {
   const { userId } = req.params;
@@ -326,7 +362,6 @@ app.get('/datatotalt/:userId', (req, res) => {
       });
     });
   });
-
 //ใช้ในการดึงข้อมูลตารางยอดรวม
 app.get('/datatotaltl/:userId', (req, res) => {
   const { userId } = req.params;
@@ -357,10 +392,6 @@ app.get('/datatotaltl/:userId', (req, res) => {
       });
     });
   });
-
-
-
-
 app.get('/datauser/:userId', (req, res) => {
   const { userId } = req.params;
 
@@ -377,10 +408,6 @@ app.get('/datauser/:userId', (req, res) => {
     res.json(result);
   });
 });
-
-
-
-
 app.delete('/delete', (req, res) => {
   const id = req.body.id;
   if (!id) {
@@ -403,7 +430,6 @@ app.delete('/delete', (req, res) => {
     }
   });
 });
-
 app.get('/data/:id', (req, res) => {
   const id = req.params.id;
   const query = 'SELECT * FROM users WHERE id = ?';
@@ -421,13 +447,11 @@ app.get('/data/:id', (req, res) => {
     }
   });
 });
-
 //หน้าแก้ไขผู้ใช้ (แก้ไขรหัสลูกค้าไม่ได้)
 app.put('/update/:id', (req, res) => {
   const id = req.params.id;
   const { firstname, lastname, username, password, career, tel, cs_id, salary } = req.body;
 
-  // แฮชรหัสผ่านก่อนบันทึกลงในฐานข้อมูล
   bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
     if (err) {
       console.error('Error hashing password:', err);
@@ -435,10 +459,9 @@ app.put('/update/:id', (req, res) => {
       return;
     }
 
-    // เมื่อแฮชรหัสผ่านสำเร็จ คุณสามารถอัปเดตข้อมูลในฐานข้อมูลได้
     const query = 'UPDATE users SET firstname = ?, lastname = ?, username = ?, password = ?, career = ?, tel = ?, cs_id = ?, salary = ? WHERE id = ?';
     connection.query(query, [firstname, lastname, username, hashedPassword, career, tel, cs_id,salary, id], (err, result) => {
-      // ข้อผิดพลาดในการคิวรีฐานข้อมูล
+
       if (err) {
         console.error('Error executing query:', err);
         res.status(500).json({ error: 'Failed to update data in database' });
@@ -473,18 +496,14 @@ app.put('/updatestale/:id', (req, res) => {
 
   const query = 'UPDATE balancess SET amount = ? WHERE id = ?';
     connection.query(query, [amount, id], (err, result) => {
-      // ข้อผิดพลาดในการคิวรีฐานข้อมูล
       if (err) {
         console.error('Error executing query:', err);
         res.status(500).json({ error: 'Failed to update data in database' });
         return;
       }
-
-      // ไม่พบข้อมูลที่ต้องการอัปเดต
       if (result.affectedRows === 0) {
         res.status(404).json({ error: 'Data with the specified ID not found' });
       } else {
-        // อัปเดตสำเร็จ
         const selectQuery = 'SELECT * FROM balancess WHERE id = ?';
         connection.query(selectQuery, [id], (err, role) => {
           if (err) {
@@ -492,14 +511,11 @@ app.put('/updatestale/:id', (req, res) => {
             res.status(500).json({ error: 'Failed to fetch updated data from database' });
             return;
           }
-
-          // ส่งข้อมูลที่อัปเดตสำเร็จกลับไป
           res.json({ status: 'ok', message: 'Data updated successfully', data: role });
         });
       }
     });
   });
-
 
 app.get('/datastale/:id', (req, res) => {
   const id = req.params.id;
@@ -535,18 +551,13 @@ app.delete('/deletebl', (req, res) => {
       return;
     }
 
-    if (result.affectedRows === 0) { // แก้ไขจาก affectedRoles เป็น affectedRows
+    if (result.affectedRows === 0) { 
       res.status(404).json({ error: 'Data with the specified ID not found' });
     } else {
       res.json({ message: 'Data deleted successfully' });
     }
   });
 });
-
-
-
-
-
 
 app.listen(3001, function () {
   console.log('CORS-enabled web server listening on port 3001')

@@ -33,7 +33,7 @@ INSERT INTO `users` (`id`, `cs_id`, `firstname`, `lastname`, `username`, `passwo
 (44, 'O997', 'ผักกาด', 'กินแล้วดี', 'mayowner', '$2b$10$dwxHg.UI7MxV8Q0OwdcqgeybS7FiA0Ye.D.pIehfIJGF4Z.I.ySR6', 'Owner', '0952347879', 1, NULL),
 (32, 'O999', 'Pin', 'Jaa', 'pin', '$2b$10$aXo4aubvAB8SOwg3xGei/.PvtYSp3nwIp5Jei6OmFIj2NPmZEGpqy', 'owner', '0895555555', 1, NULL);
 
---
+
 
 CREATE TABLE balancess (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -41,7 +41,8 @@ CREATE TABLE balancess (
     date_time DATETIME,
     amount int(10),
     status varchar(10),
-    FOREIGN KEY (cs_id) REFERENCES users(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
+    total int,
+    FOREIGN KEY (cs_id) REFERENCES customer(cs_id) ON UPDATE CASCADE ON DELETE CASCADE
 );
 INSERT INTO `balancess` (`id`, `cs_id`, `date_time`, `amount`, `status`) VALUES
 (1, 'A104', '2023-08-09 01:29:34', 10000, '1'),
@@ -98,7 +99,7 @@ CREATE TABLE users (
 CREATE TABLE customer (
     cs_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
-    em_id INT,
+    em_id varchar(50),
     firstname varchar(50),
     lastname varchar(50),
     career varchar(50),
@@ -110,16 +111,20 @@ CREATE TABLE customer (
 CREATE TABLE admin(
     ad_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
-    firstName VARCHAR(50),
-    lastName VARCHAR(50),
+    firstname VARCHAR(50),
+    lastname VARCHAR(50),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 CREATE TABLE owner(
     ow_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
-    firstName VARCHAR(50),
-    lastName VARCHAR(50),
+    firstname VARCHAR(50),
+    lastname VARCHAR(50),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+CREATE TABLE messages (
+  id INTEGER PRIMARY KEY AUTO_INCREMENT,
+  message TEXT
 );
 
 

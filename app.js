@@ -7,6 +7,22 @@ const bcrypt = require('bcrypt');
 const saltRounds = 10;
 var jwt = require('jsonwebtoken');
 const secret = 'login-regis'
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, './upload');
+  },
+  filename: function (req, file, cb) {
+    const extension = file.originalname.split('.').pop();
+    const filename = `${uuidv4()}.${extension}`;
+    cb(null, filename);
+  },
+});
+
+const upload = multer({ storage: storage });
+
 
 app.use(cors())
 app.use(express.json());
@@ -19,146 +35,116 @@ const connection = mysql.createConnection({
   database: 'testproject'
 });
 
-const payload = {
-  username: 'win',
-  role: 1,
-  cs_id: 'your-cs-id-value', // เพิ่ม cs_id ลงใน payload ตามต้องการ
-  iat: Math.floor(Date.now() / 1000), // หากต้องการกำหนด iat แบบแน่นอน
-  exp: Math.floor(Date.now() / 1000) + 3600, // หากต้องการกำหนด exp แบบแน่นอน
-};
-
-// สร้าง Token
-const token = jwt.sign(payload, secret);
-
 
 //ใส่ข้อมูลส่วนตัวลูกค้า
 app.post('/regis', jsonParser, function (req, res, next) {
-  connection.query(
-    'SELECT username FROM users WHERE username = ?',
-    [req.body.username],
-    function (err, results, fields) {
-      if (err) {
-        res.status(500).json({ status: 'error', message: err });
-        return;
-      }
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    if (err) {
+      res.status(500).json({ status: 'error', message: err });
+      return;
+    }
 
-      if (results.length > 0) {
-        res.status(400).json({ status: 'error', message: 'Username already exists' });
-        return;
-      }
+    connection.query(
+      'INSERT INTO users(username, password, role) VALUES (?,?,1)',
+      [req.body.username, hash],
+      function (err, results, fields) {
+        if (err) {
+          res.status(500).json({ status: 'error', message: err });
+          return;
+        }
 
-      bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+        const user_id = results.insertId;
+
         connection.query(
-          'INSERT INTO users(username, password, role) VALUES (?,?,1)',
-          [req.body.username, hash],
+          'INSERT INTO customer(user_id, cs_id, firstname, lastname, career, tel, salary) VALUES (?,?,?,?,?,?,?)',
+          [user_id, req.body.cs_id, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
           function (err, results, fields) {
             if (err) {
               res.status(500).json({ status: 'error', message: err });
               return;
             }
-            const user_id = results.insertId;
-            connection.query(
-              'INSERT INTO customer(user_id, cs_id, firstname, lastname, career, tel, salary) VALUES (?,?,?,?,?,?,?)',
-              [user_id, req.body.cs_id, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
-              function (err, results, fields) {
-                if (err) {
-                  res.status(500).json({ status: 'error', message: err });
-                  return;
-                }
-                res.json({ status: 'ok' });
-              }
-            );
+
+            res.json({ status: 'ok' });
           }
         );
-      });
-    }
-  );
+      }
+    );
+  });
 });
+
+
 
 //ใส่ข้อมูลส่วนตัวadmin
 app.post('/regisAd', jsonParser, function (req, res, next) {
-  connection.query(
-    'SELECT username FROM users WHERE username = ?',
-    [req.body.username],
-    function (err, results, fields) {
-      if (err) {
-        res.status(500).json({ status: 'error', message: err });
-        return;
-      }
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    if (err) {
+      res.status(500).json({ status: 'error', message: err });
+      return;
+    }
 
-      if (results.length > 0) {
-        res.status(400).json({ status: 'error', message: 'Username already exists' });
-        return;
-      }
-      bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    connection.query(
+      'INSERT INTO users(username, password, role) VALUES (?,?,2)',
+      [req.body.username, hash],
+      function (err, results, fields) {
+        if (err) {
+          res.status(500).json({ status: 'error', message: err });
+          return;
+        }
+
+        const user_id = results.insertId;
+
         connection.query(
-          'INSERT INTO users(username, password, role) VALUES (?, ?, 2)',
-          [req.body.username, hash],
+          'INSERT INTO admin(user_id, ad_id, firstname, lastname) VALUES (?,?,?,?)',
+          [user_id, req.body.ad_id, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
           function (err, results, fields) {
             if (err) {
               res.status(500).json({ status: 'error', message: err });
               return;
             }
-            const user_id = results.insertId;
 
-            connection.query(
-              'INSERT INTO admin(user_id, firstname, lastname) VALUES (?, ?, ?)',
-              [user_id, req.body.firstname, req.body.lastname],
-              function (err, results, fields) {
-                if (err) {
-                  res.status(500).json({ status: 'error', message: err });
-                  return;
-                }
-                res.json({ status: 'ok' });
-              }
-            );
+            res.json({ status: 'ok' });
           }
         );
-      });
-    }
-  )
+      }
+    );
+  });
 });
+
 
 //ใส่ข้อมูลส่วนตัว owner
 app.post('/regisOw', jsonParser, function (req, res, next) {
-  connection.query(
-    'SELECT username FROM users WHERE username = ?',
-    [req.body.username],
-    function (err, results, fields) {
-      if (err) {
-        res.status(500).json({ status: 'error', message: err });
-        return;
-      }
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    if (err) {
+      res.status(500).json({ status: 'error', message: err });
+      return;
+    }
 
-      if (results.length > 0) {
-        res.status(400).json({ status: 'error', message: 'Username already exists' });
-        return;
-      }
-      bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    connection.query(
+      'INSERT INTO users(username, password, role) VALUES (?,?,2)',
+      [req.body.username, hash],
+      function (err, results, fields) {
+        if (err) {
+          res.status(500).json({ status: 'error', message: err });
+          return;
+        }
+
+        const user_id = results.insertId;
+
         connection.query(
-          'INSERT INTO users(username, password, role) VALUES (?,?,3)',
-          [req.body.username, hash, req.body.role],
+          'INSERT INTO owner(user_id, ow_id, firstname, lastname) VALUES (?,?,?,?)',
+          [user_id, req.body.ow_id, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
           function (err, results, fields) {
             if (err) {
               res.status(500).json({ status: 'error', message: err });
               return;
             }
-            const user_id = results.insertId;
-            connection.query(
-              'INSERT INTO owner(user_id, firstname, lastname) VALUES (?,?,?)',
-              [user_id, req.body.firstname, req.body.lastname],
-              function (err, results, fields) {
-                if (err) {
-                  res.status(500).json({ status: 'error', message: err });
-                  return;
-                }
-                res.json({ status: 'ok' });
-              }
-            );
+
+            res.json({ status: 'ok' });
           }
         );
-      });
-    })
+      }
+    );
+  });
 });
 
 //ใส่ข้อมูลบัญชี
@@ -232,6 +218,25 @@ app.post('/auth', jsonParser, function (req, res, next) {
     res.json({ status: 'error', message: err.message });
   }
 });
+
+app.get('/checkusername', (req, res) => {
+  const query = `
+    SELECT username
+    FROM users
+  `;
+
+  connection.query(query, (err, result) => {
+    if (err) {
+      console.error('Error executing query:', err);
+      res.status(500).json({ error: 'Failed to fetch data from database' });
+      return;
+    }
+    const usernames = result.map(row => row.username);
+
+    res.json(usernames);
+  });
+});
+
 
 
 //ใช้ดึงข้อมูลส่วนตัวทั้งหมด
@@ -512,7 +517,7 @@ app.get('/data/:id', (req, res) => {
   const id = req.params.id;
 
   const query = `
-    SELECT u.username, u.password, c.firstname, c.lastname, c.cs_id, c.career, c.tel, c.salary, a.firstname AS admin_firstname, a.lastname AS admin_lastname, o.firstname AS owner_firstname, o.lastname AS owner_lastname
+    SELECT u.username, u.password, u.role, c.firstname, c.lastname, c.cs_id, c.career, c.tel, c.salary, a.firstname AS admin_firstname, a.lastname AS admin_lastname, o.firstname AS owner_firstname, o.lastname AS owner_lastname
     FROM users u
     LEFT JOIN customer c ON u.user_id = c.user_id
     LEFT JOIN admin a ON u.user_id = a.user_id
@@ -758,9 +763,6 @@ app.put('/update/admin/:id', (req, res) => {
     });
   }
 });
-
-
-
 app.put('/update/owner/:id', (req, res) => {
   const id = req.params.id;
   const { username, password, ow_id, firstname, lastname } = req.body;
@@ -770,21 +772,48 @@ app.put('/update/owner/:id', (req, res) => {
     return res.status(400).json({ error: 'Password is required' });
   }
 
-  bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
+  // ดึงข้อมูลผู้ใช้จากฐานข้อมูลเพื่อตรวจสอบรหัสผ่านเดิม
+  const selectQuery = 'SELECT password FROM users WHERE user_id = ?';
+  connection.query(selectQuery, [id], (err, results) => {
     if (err) {
-      console.error('Error hashing password:', err);
-      return res.status(500).json({ error: 'Failed to hash password' });
+      console.error('Error executing query:', err);
+      return res.status(500).json({ error: 'Failed to fetch user data from database' });
     }
 
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'User with the specified ID not found' });
+    }
+
+    const existingPassword = results[0].password;
+
+    // ตรวจสอบว่ารหัสผ่านที่ส่งมาเหมือนกับรหัสผ่านเดิมหรือไม่
+    if (password === existingPassword) {
+      // รหัสผ่านเหมือนกัน ไม่ต้อง hash รหัสผ่านใหม่
+      updateDataWithoutPassword();
+    } else {
+      // รหัสผ่านไม่เหมือน ต้อง hash รหัสผ่านใหม่
+      bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
+        if (err) {
+          console.error('Error hashing password:', err);
+          return res.status(500).json({ error: 'Failed to hash password' });
+        }
+
+        updateDataWithNewPassword(hashedPassword);
+      });
+    }
+  });
+
+  // ฟังก์ชันสำหรับอัปเดตข้อมูลโดยไม่ต้อง hash รหัสผ่านใหม่
+  function updateDataWithoutPassword() {
     // ใช้ INNER JOIN เพื่อรวมข้อมูลจาก users และ admin โดยใช้ user_id เป็นตัวเชื่อม
     const query = `
       UPDATE users u
-      INNER JOIN owner o ON o.user_id = a.user_id
-      SET o.username = ?, o.password = ?, o.firstname = ?, o.lastname = ?
+      INNER JOIN owner o ON u.user_id = o.user_id
+      SET u.username = ?, o.firstname = ?, o.lastname = ?
       WHERE u.user_id = ?
     `;
 
-    connection.query(query, [username, hashedPassword, firstname, lastname, id], (err, result) => {
+    connection.query(query, [username, firstname, lastname, id], (err, result) => {
       if (err) {
         console.error('Error executing query:', err);
         return res.status(500).json({ error: 'Failed to update data in database' });
@@ -802,13 +831,47 @@ app.put('/update/owner/:id', (req, res) => {
           console.error('Error executing query:', err);
           return res.status(500).json({ error: 'Failed to fetch updated data from database' });
         }
-        
 
         // ส่งข้อมูลที่อัปเดตสำเร็จกลับไป
         res.json({ status: 'ok', message: 'Data updated successfully', data: updatedData });
       });
     });
-  });
+  }
+
+  // ฟังก์ชันสำหรับอัปเดตข้อมูลโดย hash รหัสผ่านใหม่
+  function updateDataWithNewPassword(newHashedPassword) {
+    // ใช้ INNER JOIN เพื่อรวมข้อมูลจาก users และ admin โดยใช้ user_id เป็นตัวเชื่อม
+    const query = `
+      UPDATE users u
+      INNER JOIN owner o ON u.user_id = o.user_id
+      SET u.username = ?, u.password = ?, o.firstname = ?, o.lastname = ?
+      WHERE u.user_id = ?
+    `;
+
+    connection.query(query, [username, newHashedPassword, firstname, lastname, id], (err, result) => {
+      if (err) {
+        console.error('Error executing query:', err);
+        return res.status(500).json({ error: 'Failed to update data in database' });
+      }
+
+      // ไม่พบข้อมูลที่ต้องการอัปเดต
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Data with the specified ID not found' });
+      }
+
+      // อัปเดตสำเร็จ
+      const selectQuery = 'SELECT * FROM users u INNER JOIN owner o ON u.user_id = o.user_id WHERE u.user_id = ?';
+      connection.query(selectQuery, [id], (err, updatedData) => {
+        if (err) {
+          console.error('Error executing query:', err);
+          return res.status(500).json({ error: 'Failed to fetch updated data from database' });
+        }
+
+        // ส่งข้อมูลที่อัปเดตสำเร็จกลับไป
+        res.json({ status: 'ok', message: 'Data updated successfully', data: updatedData });
+      });
+    });
+  }
 });
 
 
@@ -912,6 +975,30 @@ app.put('/message', (req, res) => {
     } else {
       res.status(200).json({ message: newMessage });
     }
+  });
+});
+
+app.post('/upload-photo', upload.single('photo'), function (req, res) {
+  if (!req.file) {
+    return res.status(400).json({ status: 'error', message: 'ไม่มีการอัพโหลดรูปภาพ' });
+  }
+
+  const photoName = req.body.photoName;
+  const description = req.body.description;
+  const filename = req.file.filename;
+
+  const sql = 'INSERT INTO photo (photo_name, description, filename) VALUES (?, ?, ?)';
+  const values = [photoName, description, filename];
+
+  connection.query(sql, values, function (err, result) {
+    if (err) {
+      console.error('เกิดข้อผิดพลาดในการบันทึกข้อมูลลงในฐานข้อมูล: ' + err);
+      return res.status(500).json({ status: 'error', message: 'ไม่สามารถบันทึกรูปภาพในฐานข้อมูลได้' });
+    }
+
+    console.log('ข้อมูลรูปภาพถูกบันทึกในฐานข้อมูลด้วย ID ' + result.insertId);
+
+    res.json({ status: 'ok', message: 'อัพโหลดรูปภาพและบันทึกลงฐานข้อมูลเรียบร้อยแล้ว' });
   });
 });
 

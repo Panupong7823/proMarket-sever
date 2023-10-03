@@ -71,9 +71,6 @@ app.post('/regis', jsonParser, function (req, res, next) {
     );
   });
 });
-
-
-
 //ใส่ข้อมูลส่วนตัวadmin
 app.post('/regisAd', jsonParser, function (req, res, next) {
   bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
@@ -109,8 +106,6 @@ app.post('/regisAd', jsonParser, function (req, res, next) {
     );
   });
 });
-
-
 //ใส่ข้อมูลส่วนตัว owner
 app.post('/regisOw', jsonParser, function (req, res, next) {
   bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
@@ -146,11 +141,8 @@ app.post('/regisOw', jsonParser, function (req, res, next) {
     );
   });
 });
-
 //ใส่ข้อมูลบัญชี
 app.post('/regisBl', jsonParser, function (req, res, next) {
-
-
   connection.query(
     'INSERT INTO balancess (cs_id,date_time,status,amount) VALUES (?,NOW(),?,?)',
     [req.body.cs_id, req.body.status, req.body.amount],
@@ -164,10 +156,17 @@ app.post('/regisBl', jsonParser, function (req, res, next) {
   );
 });
 
-
+//Login เข้าสู่ระบบ
 app.post('/login', jsonParser, function (req, res, next) {
   connection.query(
-    'SELECT * FROM users u LEFT JOIN customer c ON u.user_id = c.user_id WHERE u.username=?',
+    'SELECT u.*, c.firstname AS customer_firstname, c.lastname AS customer_lastname, ' +
+    'a.firstname AS admin_firstname, a.lastname AS admin_lastname, ' +
+    'o.firstname AS owner_firstname, o.lastname AS owner_lastname ' +
+    'FROM users u ' +
+    'LEFT JOIN customer c ON u.user_id = c.user_id ' +
+    'LEFT JOIN admin a ON u.user_id = a.user_id ' +
+    'LEFT JOIN owner o ON u.user_id = o.user_id ' +
+    'WHERE u.username = ?',
     [req.body.username],
     function (err, users, fields) {
       if (err) {
@@ -186,18 +185,26 @@ app.post('/login', jsonParser, function (req, res, next) {
         }
 
         if (Login) {
-          var token = jwt.sign(
-            {
-              firstname: users[0].firstname,
-              lastname: users[0].lastname,
-              username: users[0].username,
-              role: users[0].role,
-              user_id: users[0].user_id,
-              cs_id: users[0].cs_id,
-            },
-            secret,
-            { expiresIn: '1h' }
-          );
+          var tokenData = {
+            username: users[0].username,
+            role: users[0].role,
+            user_id: users[0].user_id,
+            cs_id: users[0].cs_id,
+          };
+
+          if (users[0].role === 1) {
+            tokenData.firstname = users[0].customer_firstname;
+            tokenData.lastname = users[0].customer_lastname;
+          } else if (users[0].role === 2) {
+            tokenData.firstname = users[0].admin_firstname;
+            tokenData.lastname = users[0].admin_lastname;
+          } else if (users[0].role === 3) {
+            tokenData.firstname = users[0].owner_firstname;
+            tokenData.lastname = users[0].owner_lastname;
+          }
+
+          var token = jwt.sign(tokenData, secret, { expiresIn: '1h' });
+
           res.json({ status: 'ok', message: 'login success', token, user: users[0].role });
         } else {
           res.json({ status: 'error', message: 'login failed' });
@@ -207,8 +214,7 @@ app.post('/login', jsonParser, function (req, res, next) {
   );
 });
 
-
-
+//authen
 app.post('/auth', jsonParser, function (req, res, next) {
   try {
     const token = req.headers.authorization.split(' ')[1];
@@ -218,7 +224,7 @@ app.post('/auth', jsonParser, function (req, res, next) {
     res.json({ status: 'error', message: err.message });
   }
 });
-
+//checkusername
 app.get('/checkusername', (req, res) => {
   const query = `
     SELECT username
@@ -236,9 +242,6 @@ app.get('/checkusername', (req, res) => {
     res.json(usernames);
   });
 });
-
-
-
 //ใช้ดึงข้อมูลส่วนตัวทั้งหมด
 app.get('/data', (req, res) => {
   const query = `
@@ -258,7 +261,6 @@ app.get('/data', (req, res) => {
     res.json(result);
   });
 });
-
 //ใช้ดึงข้อมูลส่วนตัวของadmin
 app.get('/dataAd', (req, res) => {
   const query = `
@@ -267,7 +269,6 @@ app.get('/dataAd', (req, res) => {
     INNER JOIN users ON admin.user_id = users.user_id
     WHERE users.role = 2
 `;
-
   connection.query(query, (err, result) => {
     if (err) {
       console.error('Error executing query:', err);
@@ -296,7 +297,6 @@ app.get('/dataOw', (req, res) => {
     res.json(result);
   });
 });
-
 //ใช้ดึงข้อมูลยอดค้างทั้งหมด
 app.get('/databalances', (req, res) => {
   const databl = `
@@ -441,6 +441,7 @@ app.get('/datatotaltl/:userId', (req, res) => {
     });
   });
 });
+//หา user
 app.get('/datauser/:csId', (req, res) => {
   const { csId } = req.params;
 
@@ -460,8 +461,7 @@ app.get('/datauser/:csId', (req, res) => {
     res.json(result);
   });
 });
-
-
+//ลบ user
 app.delete('/delete', (req, res) => {
   const user_id = req.body.user_id;
   if (!user_id) {
@@ -511,8 +511,7 @@ app.delete('/delete', (req, res) => {
     });
   });
 });
-
-//ค่อยแก้
+//ดึงข้อมูลuserทั้งหมด
 app.get('/data/:id', (req, res) => {
   const id = req.params.id;
 
@@ -540,7 +539,6 @@ app.get('/data/:id', (req, res) => {
     }
   });
 });
-
 //หน้าแก้ไขผู้ใช้ (แก้ไขรหัสลูกค้าไม่ได้)
 app.put('/update/:id', (req, res) => {
   const id = req.params.id;
@@ -652,17 +650,15 @@ app.put('/update/:id', (req, res) => {
     });
   }
 });
-
+//หน้าแก้ไขadmin (แก้ไขรหัสลูกค้าไม่ได้)
 app.put('/update/admin/:id', (req, res) => {
   const id = req.params.id;
   const { username, password, ad_id, firstname, lastname } = req.body;
 
-  // ตรวจสอบว่ามีการส่ง password มาหรือไม่
   if (!password) {
     return res.status(400).json({ error: 'Password is required' });
   }
 
-  // ดึงข้อมูลผู้ใช้จากฐานข้อมูลเพื่อตรวจสอบรหัสผ่านเดิม
   const selectQuery = 'SELECT password FROM users WHERE user_id = ?';
   connection.query(selectQuery, [id], (err, results) => {
     if (err) {
@@ -676,61 +672,47 @@ app.put('/update/admin/:id', (req, res) => {
 
     const existingPassword = results[0].password;
 
-    // ตรวจสอบว่ารหัสผ่านที่ส่งมาเหมือนกับรหัสผ่านเดิมหรือไม่
     if (password === existingPassword) {
-      // รหัสผ่านเหมือนกัน ไม่ต้อง hash รหัสผ่านใหม่
       updateDataWithoutPassword();
     } else {
-      // รหัสผ่านไม่เหมือน ต้อง hash รหัสผ่านใหม่
       bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
         if (err) {
           console.error('Error hashing password:', err);
           return res.status(500).json({ error: 'Failed to hash password' });
         }
-
         updateDataWithNewPassword(hashedPassword);
       });
     }
   });
 
-  // ฟังก์ชันสำหรับอัปเดตข้อมูลโดยไม่ต้อง hash รหัสผ่านใหม่
   function updateDataWithoutPassword() {
-    // ใช้ INNER JOIN เพื่อรวมข้อมูลจาก users และ admin โดยใช้ user_id เป็นตัวเชื่อม
     const query = `
       UPDATE users u
       INNER JOIN admin a ON u.user_id = a.user_id
       SET u.username = ?, a.firstname = ?, a.lastname = ?
       WHERE u.user_id = ?
     `;
-
     connection.query(query, [username, firstname, lastname, id], (err, result) => {
       if (err) {
         console.error('Error executing query:', err);
         return res.status(500).json({ error: 'Failed to update data in database' });
       }
 
-      // ไม่พบข้อมูลที่ต้องการอัปเดต
       if (result.affectedRows === 0) {
         return res.status(404).json({ error: 'Data with the specified ID not found' });
       }
 
-      // อัปเดตสำเร็จ
       const selectQuery = 'SELECT * FROM users u INNER JOIN admin a ON u.user_id = a.user_id WHERE u.user_id = ?';
       connection.query(selectQuery, [id], (err, updatedData) => {
         if (err) {
           console.error('Error executing query:', err);
           return res.status(500).json({ error: 'Failed to fetch updated data from database' });
         }
-
-        // ส่งข้อมูลที่อัปเดตสำเร็จกลับไป
         res.json({ status: 'ok', message: 'Data updated successfully', data: updatedData });
       });
     });
   }
-
-  // ฟังก์ชันสำหรับอัปเดตข้อมูลโดย hash รหัสผ่านใหม่
   function updateDataWithNewPassword(newHashedPassword) {
-    // ใช้ INNER JOIN เพื่อรวมข้อมูลจาก users และ admin โดยใช้ user_id เป็นตัวเชื่อม
     const query = `
       UPDATE users u
       INNER JOIN admin a ON u.user_id = a.user_id
@@ -743,36 +725,28 @@ app.put('/update/admin/:id', (req, res) => {
         console.error('Error executing query:', err);
         return res.status(500).json({ error: 'Failed to update data in database' });
       }
-
-      // ไม่พบข้อมูลที่ต้องการอัปเดต
       if (result.affectedRows === 0) {
         return res.status(404).json({ error: 'Data with the specified ID not found' });
       }
 
-      // อัปเดตสำเร็จ
       const selectQuery = 'SELECT * FROM users u INNER JOIN admin a ON u.user_id = a.user_id WHERE u.user_id = ?';
       connection.query(selectQuery, [id], (err, updatedData) => {
         if (err) {
           console.error('Error executing query:', err);
           return res.status(500).json({ error: 'Failed to fetch updated data from database' });
         }
-
-        // ส่งข้อมูลที่อัปเดตสำเร็จกลับไป
         res.json({ status: 'ok', message: 'Data updated successfully', data: updatedData });
       });
     });
   }
 });
+//หน้าแก้ไขowner (แก้ไขรหัสลูกค้าไม่ได้)
 app.put('/update/owner/:id', (req, res) => {
   const id = req.params.id;
   const { username, password, ow_id, firstname, lastname } = req.body;
-
-  // ตรวจสอบว่ามีการส่ง password มาหรือไม่
   if (!password) {
     return res.status(400).json({ error: 'Password is required' });
   }
-
-  // ดึงข้อมูลผู้ใช้จากฐานข้อมูลเพื่อตรวจสอบรหัสผ่านเดิม
   const selectQuery = 'SELECT password FROM users WHERE user_id = ?';
   connection.query(selectQuery, [id], (err, results) => {
     if (err) {
@@ -786,12 +760,9 @@ app.put('/update/owner/:id', (req, res) => {
 
     const existingPassword = results[0].password;
 
-    // ตรวจสอบว่ารหัสผ่านที่ส่งมาเหมือนกับรหัสผ่านเดิมหรือไม่
     if (password === existingPassword) {
-      // รหัสผ่านเหมือนกัน ไม่ต้อง hash รหัสผ่านใหม่
       updateDataWithoutPassword();
     } else {
-      // รหัสผ่านไม่เหมือน ต้อง hash รหัสผ่านใหม่
       bcrypt.hash(password, saltRounds, (err, hashedPassword) => {
         if (err) {
           console.error('Error hashing password:', err);
@@ -803,9 +774,7 @@ app.put('/update/owner/:id', (req, res) => {
     }
   });
 
-  // ฟังก์ชันสำหรับอัปเดตข้อมูลโดยไม่ต้อง hash รหัสผ่านใหม่
   function updateDataWithoutPassword() {
-    // ใช้ INNER JOIN เพื่อรวมข้อมูลจาก users และ admin โดยใช้ user_id เป็นตัวเชื่อม
     const query = `
       UPDATE users u
       INNER JOIN owner o ON u.user_id = o.user_id
@@ -818,29 +787,21 @@ app.put('/update/owner/:id', (req, res) => {
         console.error('Error executing query:', err);
         return res.status(500).json({ error: 'Failed to update data in database' });
       }
-
-      // ไม่พบข้อมูลที่ต้องการอัปเดต
       if (result.affectedRows === 0) {
         return res.status(404).json({ error: 'Data with the specified ID not found' });
       }
-
-      // อัปเดตสำเร็จ
       const selectQuery = 'SELECT * FROM users u INNER JOIN owner o ON u.user_id = o.user_id WHERE u.user_id = ?';
       connection.query(selectQuery, [id], (err, updatedData) => {
         if (err) {
           console.error('Error executing query:', err);
           return res.status(500).json({ error: 'Failed to fetch updated data from database' });
         }
-
-        // ส่งข้อมูลที่อัปเดตสำเร็จกลับไป
         res.json({ status: 'ok', message: 'Data updated successfully', data: updatedData });
       });
     });
   }
 
-  // ฟังก์ชันสำหรับอัปเดตข้อมูลโดย hash รหัสผ่านใหม่
   function updateDataWithNewPassword(newHashedPassword) {
-    // ใช้ INNER JOIN เพื่อรวมข้อมูลจาก users และ admin โดยใช้ user_id เป็นตัวเชื่อม
     const query = `
       UPDATE users u
       INNER JOIN owner o ON u.user_id = o.user_id
@@ -853,13 +814,9 @@ app.put('/update/owner/:id', (req, res) => {
         console.error('Error executing query:', err);
         return res.status(500).json({ error: 'Failed to update data in database' });
       }
-
-      // ไม่พบข้อมูลที่ต้องการอัปเดต
       if (result.affectedRows === 0) {
         return res.status(404).json({ error: 'Data with the specified ID not found' });
       }
-
-      // อัปเดตสำเร็จ
       const selectQuery = 'SELECT * FROM users u INNER JOIN owner o ON u.user_id = o.user_id WHERE u.user_id = ?';
       connection.query(selectQuery, [id], (err, updatedData) => {
         if (err) {
@@ -867,14 +824,11 @@ app.put('/update/owner/:id', (req, res) => {
           return res.status(500).json({ error: 'Failed to fetch updated data from database' });
         }
 
-        // ส่งข้อมูลที่อัปเดตสำเร็จกลับไป
         res.json({ status: 'ok', message: 'Data updated successfully', data: updatedData });
       });
     });
   }
 });
-
-
 //หน้าแก้ไขยอด
 app.put('/updatestale/:id', (req, res) => {
   const id = req.params.id;

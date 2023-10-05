@@ -160,6 +160,7 @@ app.post('/regisBl', jsonParser, function (req, res, next) {
 app.post('/login', jsonParser, function (req, res, next) {
   connection.query(
     'SELECT u.*, c.firstname AS customer_firstname, c.lastname AS customer_lastname, ' +
+    'c.cs_id AS cs_id, ' +
     'a.firstname AS admin_firstname, a.lastname AS admin_lastname, ' +
     'o.firstname AS owner_firstname, o.lastname AS owner_lastname ' +
     'FROM users u ' +
@@ -174,41 +175,37 @@ app.post('/login', jsonParser, function (req, res, next) {
         return;
       }
       if (users.length === 0) {
-        res.json({ status: 'error', message: 'user not found' });
+        res.json({ status: 'error', message: 'User not found' });
         return;
       }
 
-      bcrypt.compare(req.body.password, users[0].password, function (err, Login) {
-        if (err) {
-          res.json({ status: 'error', message: 'login failed' });
+      bcrypt.compare(req.body.password, users[0].password, function (err, loginSuccess) {
+        if (err || !loginSuccess) {
+          res.json({ status: 'error', message: 'Login failed' });
           return;
         }
 
-        if (Login) {
-          var tokenData = {
-            username: users[0].username,
-            role: users[0].role,
-            user_id: users[0].user_id,
-            cs_id: users[0].cs_id,
-          };
+        var tokenData = {
+          username: users[0].username,
+          role: users[0].role,
+          user_id: users[0].user_id,
+        };
 
-          if (users[0].role === 1) {
-            tokenData.firstname = users[0].customer_firstname;
-            tokenData.lastname = users[0].customer_lastname;
-          } else if (users[0].role === 2) {
-            tokenData.firstname = users[0].admin_firstname;
-            tokenData.lastname = users[0].admin_lastname;
-          } else if (users[0].role === 3) {
-            tokenData.firstname = users[0].owner_firstname;
-            tokenData.lastname = users[0].owner_lastname;
-          }
-
-          var token = jwt.sign(tokenData, secret, { expiresIn: '1h' });
-
-          res.json({ status: 'ok', message: 'login success', token, user: users[0].role });
-        } else {
-          res.json({ status: 'error', message: 'login failed' });
+        if (users[0].role === 1) {
+          tokenData.firstname = users[0].customer_firstname;
+          tokenData.lastname = users[0].customer_lastname;
+          tokenData.cs_id = users[0].cs_id; 
+        } else if (users[0].role === 2) {
+          tokenData.firstname = users[0].admin_firstname;
+          tokenData.lastname = users[0].admin_lastname;
+        } else if (users[0].role === 3) {
+          tokenData.firstname = users[0].owner_firstname;
+          tokenData.lastname = users[0].owner_lastname;
         }
+
+        var token = jwt.sign(tokenData, secret, { expiresIn: '1h' });
+
+        res.json({ status: 'ok', message: 'Login success', token, user: users[0].role });
       });
     }
   );

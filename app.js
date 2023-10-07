@@ -194,7 +194,7 @@ app.post('/login', jsonParser, function (req, res, next) {
         if (users[0].role === 1) {
           tokenData.firstname = users[0].customer_firstname;
           tokenData.lastname = users[0].customer_lastname;
-          tokenData.cs_id = users[0].cs_id; 
+          tokenData.cs_id = users[0].cs_id;
         } else if (users[0].role === 2) {
           tokenData.firstname = users[0].admin_firstname;
           tokenData.lastname = users[0].admin_lastname;
@@ -336,9 +336,19 @@ app.get('/databalances', (req, res) => {
         return;
       }
 
+      const staleTotals = resultl.map(row => row.stale_total);
+      const totalStaleTotal = staleTotals.reduce((acc, curr) => acc + parseInt(curr, 10), 0);
+      const payTotals = resultl.map(row => row.pay_total);
+      const totalPayTotal = payTotals.reduce((acc, curr) => acc + parseInt(curr, 10), 0);
+      const totalTotals = resultl.map(row => row.total);
+      const totalTotal = totalTotals.reduce((acc, curr) => acc + parseInt(curr, 10), 0);
+
       const responseData = {
         databalanceResult: resultbl,
-        datatotalResult: resultl
+        datatotalResult: resultl,
+        totalStaleTotal,
+        totalPayTotal,
+        totalTotal
       };
 
       res.json(responseData);

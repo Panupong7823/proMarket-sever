@@ -43,5 +43,7 @@ CREATE TABLE messages (
   id INTEGER PRIMARY KEY AUTO_INCREMENT,
   message TEXT
 );
+INSERT INTO `messages` (`id`, `message`) VALUES
+(1, 'กรุณาชำระเงินทั้งหมดไม่เกินวันที่ 25 ของทุกเดือน \nหากเกินกำหนด จะขอยุติการจำหน่ายสินค้าจนกว่าจะชำระเงินเรียบร้อย ');
 
 

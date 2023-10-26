@@ -9,6 +9,7 @@ var jwt = require('jsonwebtoken');
 const secret = 'login-regis'
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
+const dayjs = require("dayjs")
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -40,27 +41,40 @@ const connection = mysql.createConnection({
 app.post('/regis', jsonParser, function (req, res, next) {
   bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
     if (err) {
-      res.status(500).json({ status: 'error', message: err });
+      console.error('Error in bcrypt:', err);
+      res.status(500).json({ status: 'error', message: 'Internal server error' });
       return;
     }
 
     connection.query(
       'INSERT INTO users(username, password, role) VALUES (?,?,1)',
       [req.body.username, hash],
-      function (err, results, fields) {
+      function (err, userResult, fields) {
         if (err) {
-          res.status(500).json({ status: 'error', message: err });
-          return;
+          console.error('Error in inserting user data:', err);
+         res.status(500).json({ status: 'error', message: 'Internal server error' });
+         return;
         }
 
-        const user_id = results.insertId;
+        const user_id = userResult.insertId;
 
         connection.query(
           'INSERT INTO customer(user_id, cs_id, firstname, lastname, career, tel, salary) VALUES (?,?,?,?,?,?,?)',
           [user_id, req.body.cs_id, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
-          function (err, results, fields) {
+          function (err, customerResult, fields) {
             if (err) {
-              res.status(500).json({ status: 'error', message: err });
+              console.error('Error in inserting customer data:', err);
+              connection.query(
+                'DELETE FROM users WHERE user_id = ?',
+                [user_id],
+                function (deleteErr, deleteResult) {
+                  if (deleteErr) {
+                    console.error('Error in deleting user:', deleteErr);
+                  }
+                }
+              );
+
+              res.status(500).json({ status: 'error', message: 'Internal server error' });
               return;
             }
 
@@ -71,31 +85,47 @@ app.post('/regis', jsonParser, function (req, res, next) {
     );
   });
 });
+
+
+
 //ใส่ข้อมูลส่วนตัวadmin
 app.post('/regisAd', jsonParser, function (req, res, next) {
   bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
     if (err) {
-      res.status(500).json({ status: 'error', message: err });
+      console.error('Error in bcrypt:', err);
+      res.status(500).json({ status: 'error', message: 'Internal server error' });
       return;
     }
 
     connection.query(
       'INSERT INTO users(username, password, role) VALUES (?,?,2)',
       [req.body.username, hash],
-      function (err, results, fields) {
+      function (err, userResult, fields) {
         if (err) {
-          res.status(500).json({ status: 'error', message: err });
+          console.error('Error in inserting user data:', err);
+          res.status(500).json({ status: 'error', message: 'Internal server error' });
           return;
         }
 
-        const user_id = results.insertId;
+        const user_id = userResult.insertId;
 
         connection.query(
           'INSERT INTO admin(user_id, ad_id, firstname, lastname) VALUES (?,?,?,?)',
-          [user_id, req.body.ad_id, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
-          function (err, results, fields) {
+          [user_id, req.body.ad_id, req.body.firstname, req.body.lastname],
+          function (err, adminResult, fields) {
             if (err) {
-              res.status(500).json({ status: 'error', message: err });
+              console.error('Error in inserting admin data:', err);
+              connection.query(
+                'DELETE FROM users WHERE user_id = ?',
+                [user_id],
+                function (deleteErr, deleteResult) {
+                  if (deleteErr) {
+                    console.error('Error in deleting user:', deleteErr);
+                  }
+                }
+              );
+
+              res.status(500).json({ status: 'error', message: 'Internal server error' });
               return;
             }
 
@@ -106,31 +136,45 @@ app.post('/regisAd', jsonParser, function (req, res, next) {
     );
   });
 });
+
 //ใส่ข้อมูลส่วนตัว owner
 app.post('/regisOw', jsonParser, function (req, res, next) {
   bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
     if (err) {
-      res.status(500).json({ status: 'error', message: err });
+      console.error('Error in bcrypt:', err);
+      res.status(500).json({ status: 'error', message: 'Internal server error' });
       return;
     }
 
     connection.query(
-      'INSERT INTO users(username, password, role) VALUES (?,?,2)',
+      'INSERT INTO users(username, password, role) VALUES (?,?,3)',
       [req.body.username, hash],
-      function (err, results, fields) {
+      function (err, userResult, fields) {
         if (err) {
-          res.status(500).json({ status: 'error', message: err });
+          console.error('Error in inserting user data:', err);
+          res.status(500).json({ status: 'error', message: 'Internal server error' });
           return;
         }
 
-        const user_id = results.insertId;
+        const user_id = userResult.insertId;
 
         connection.query(
           'INSERT INTO owner(user_id, ow_id, firstname, lastname) VALUES (?,?,?,?)',
-          [user_id, req.body.ow_id, req.body.firstname, req.body.lastname, req.body.career, req.body.tel, req.body.salary],
-          function (err, results, fields) {
+          [user_id, req.body.ow_id, req.body.firstname, req.body.lastname],
+          function (err, ownerResult, fields) {
             if (err) {
-              res.status(500).json({ status: 'error', message: err });
+              console.error('Error in inserting owner data:', err);
+              connection.query(
+                'DELETE FROM users WHERE user_id = ?',
+                [user_id],
+                function (deleteErr, deleteResult) {
+                  if (deleteErr) {
+                    console.error('Error in deleting user:', deleteErr);
+                  }
+                }
+              );
+
+              res.status(500).json({ status: 'error', message: 'Internal server error' });
               return;
             }
 
@@ -141,17 +185,21 @@ app.post('/regisOw', jsonParser, function (req, res, next) {
     );
   });
 });
+
 //ใส่ข้อมูลบัญชี
 app.post('/regisBl', jsonParser, function (req, res, next) {
+  const date = new Date();
+  const formattedDate = dayjs(date).format('YYYY-MM-DD HH:mm:ss'); // Format the date using dayjs
+
   connection.query(
-    'INSERT INTO balancess (cs_id,date_time,status,amount) VALUES (?,NOW(),?,?)',
-    [req.body.cs_id, req.body.status, req.body.amount],
+    'INSERT INTO balancess (cs_id, date_time, status, amount) VALUES (?, ?, ?, ?)',
+    [req.body.cs_id, formattedDate, req.body.status, req.body.amount],
     function (err, results, fields) {
       if (err) {
         res.status(500).json({ status: 'error', message: err });
-        return
+        return;
       }
-      res.json({ status: 'ok' })
+      res.json({ status: 'ok' });
     }
   );
 });
@@ -469,55 +517,96 @@ app.get('/datauser/:csId', (req, res) => {
   });
 });
 //ลบ user
-app.delete('/delete', (req, res) => {
+app.delete('/delete/customer', (req, res) => {
+  const user_id = req.body.user_id;
+  if (!user_id) {
+    res.status(400).json({ error: 'ID is required in the request body' });
+    return;
+  }
+  const checkBalancesQuery = 'SELECT * FROM balancess WHERE cs_id = ?';
+  connection.query(checkBalancesQuery, [user_id], (err, balancesData) => {
+    if (err) {
+      console.error('Error executing query to check balances:', err);
+      return res.status(500).json({ error: 'Failed to check balances' });
+    }
+    const deleteCustomerQuery = 'DELETE FROM customer WHERE user_id = ?';
+    connection.query(deleteCustomerQuery, [user_id], (err, customerResult) => {
+      if (err) {
+        console.error('Error executing query for deleting customer:', err);
+        return res.status(500).json({ error: 'Failed to delete data from customer table' });
+      }
+      if (balancesData.length > 0) {
+        const deleteBalancesQuery = 'DELETE FROM balancess WHERE cs_id = ?';
+        connection.query(deleteBalancesQuery, [user_id], (err, balancesResult) => {
+          if (err) {
+            console.error('Error executing query for deleting balances:', err);
+            return res.status(500).json({ error: 'Failed to delete data from balances table' });
+          }
+          const deleteUserQuery = 'DELETE FROM users WHERE user_id = ?';
+          connection.query(deleteUserQuery, [user_id], (err, userResult) => {
+            if (err) {
+              console.error('Error executing query for deleting users:', err);
+              res.status(500).json({ error: 'Failed to delete data from users table' });
+              return;
+            }
+            return res.json({ message: 'Data deleted successfully' });
+          });
+        });
+      } else {
+        const deleteUserQuery = 'DELETE FROM users WHERE user_id = ?';
+        connection.query(deleteUserQuery, [user_id], (err, userResult) => {
+          if (err) {
+            console.error('Error executing query for deleting users:', err);
+            res.status(500).json({ error: 'Failed to delete data from users table' });
+            return;
+          }
+          return res.json({ message: 'Data deleted successfully' });
+        });
+      }
+    });
+  });
+});
+
+app.delete('/delete/admin-owner', (req, res) => {
   const user_id = req.body.user_id;
   if (!user_id) {
     res.status(400).json({ error: 'ID is required in the request body' });
     return;
   }
 
-  const deleteCustomerQuery = 'DELETE FROM customer WHERE user_id = ?';
-  connection.query(deleteCustomerQuery, [user_id], (err, customerResult) => {
+  const deleteAdminQuery = 'DELETE FROM admin WHERE user_id = ?';
+  connection.query(deleteAdminQuery, [user_id], (err, adminResult) => {
     if (err) {
-      console.error('Error executing query:', err);
-      res.status(500).json({ error: 'Failed to delete data from customer table' });
-      return;
+      console.error('Error executing query for deleting admin:', err);
+      return res.status(500).json({ error: 'Failed to delete data from admin table' });
     }
-
-    const deleteAdminQuery = 'DELETE FROM admin WHERE user_id = ?';
-    connection.query(deleteAdminQuery, [user_id], (err, adminResult) => {
+    const deleteOwnerQuery = 'DELETE FROM owner WHERE user_id = ?';
+    connection.query(deleteOwnerQuery, [user_id], (err, ownerResult) => {
       if (err) {
-        console.error('Error executing query:', err);
-        res.status(500).json({ error: 'Failed to delete data from admin table' });
-        return;
+        console.error('Error executing query for deleting owner:', err);
+        return res.status(500).json({ error: 'Failed to delete data from owner table' });
       }
-
-      const deleteOwnerQuery = 'DELETE FROM owner WHERE user_id = ?';
-      connection.query(deleteOwnerQuery, [user_id], (err, ownerResult) => {
+      const deleteUserQuery = 'DELETE FROM users WHERE user_id = ?';
+      connection.query(deleteUserQuery, [user_id], (err, userResult) => {
         if (err) {
-          console.error('Error executing query:', err);
-          res.status(500).json({ error: 'Failed to delete data from owner table' });
-          return;
+          console.error('Error executing query for deleting users:', err);
+          return res.status(500).json({ error: 'Failed to delete data from users table' });
         }
 
-        const deleteUserQuery = 'DELETE FROM users WHERE user_id = ?';
-        connection.query(deleteUserQuery, [user_id], (err, userResult) => {
-          if (err) {
-            console.error('Error executing query:', err);
-            res.status(500).json({ error: 'Failed to delete data from users table' });
-            return;
-          }
-
-          if (userResult.affectedRows === 0) {
-            res.status(404).json({ error: 'Data with the specified ID not found' });
-          } else {
-            res.json({ message: 'Data deleted successfully' });
-          }
-        });
+        return res.json({ message: 'Data deleted successfully' });
       });
     });
   });
 });
+
+
+
+
+
+
+
+
+
 //ดึงข้อมูลuserทั้งหมด
 app.get('/data/:id', (req, res) => {
   const id = req.params.id;
